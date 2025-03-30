@@ -1,39 +1,36 @@
 const express = require('express');
-const fs = require('fs');
-const cors = require('cors');
 const bodyParser = require('body-parser');
+const cors = require('cors');
+const fetch = require('node-fetch'); // required for sending to Google Sheets
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
 
-const DATA_FILE = 'submissions.json';
+// Your live Google Sheet webhook
+const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxOTLbmRENYKwfIXGwkPEzQ24PKqjA6uXZlcccUkw92wn6PID0S8NrKczfc2mQi72I6/exec';
 
-let submissions = [];
-if (fs.existsSync(DATA_FILE)) {
-  const fileData = fs.readFileSync(DATA_FILE);
-  submissions = JSON.parse(fileData);
-}
+app.post('/submit', async (req, res) => {
+  const data = req.body;
 
-app.post('/submit', (req, res) => {
-  const submission = req.body;
-  submission.timestamp = new Date().toISOString();
+  try {
+    const response = await fetch(GOOGLE_SHEET_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
 
-  submissions.push(submission);
-
-  fs.writeFile(DATA_FILE, JSON.stringify(submissions, null, 2), (err) => {
-    if (err) {
-      console.error('Error writing to file', err);
-      return res.status(500).send('Server error');
-    }
-    res.status(200).send('Submission saved');
-  });
+    res.status(200).send('✅ Forwarded to Google Sheet');
+  } catch (err) {
+    console.error('❌ Error forwarding:', err);
+    res.status(500).send('Server error');
+  }
 });
 
-app.get('/submissions', (req, res) => {
-  res.json(submissions);
+app.get('/', (req, res) => {
+  res.send('Quiz backend is live. Use POST /submit to send data.');
 });
 
 app.listen(PORT, () => {
